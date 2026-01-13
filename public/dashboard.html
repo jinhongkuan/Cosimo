@@ -181,7 +181,8 @@
   <header>
     <h1>Dashboard</h1>
     <div class="nav">
-      <a href="/app">← Back to App</a>
+      <a href="/about">About</a>
+      <a href="/app">App</a>
       <a href="/auth/logout">Logout</a>
     </div>
   </header>
@@ -248,7 +249,7 @@
 
     <div class="card">
       <h2>MCP Integration</h2>
-      <p class="info" style="margin-bottom:16px">Add this to your Claude Desktop or coding agent's MCP config:</p>
+      <p class="info" style="margin-bottom:16px">Add this to your Claude Code or Claude Desktop MCP config. Encryption happens locally—your passphrase never leaves your machine.</p>
       <div class="mcp-config" id="mcpConfig">Loading...</div>
       <p class="info" style="margin-top:16px" id="mcpNote"></p>
       <p class="info" style="margin-top:8px">
@@ -305,26 +306,24 @@
         badge.classList.add('enabled');
         enableForm.style.display = 'none';
         enabledInfo.style.display = 'block';
-        document.getElementById('encryptionDesc').textContent = 'Your data is encrypted with AES-256-GCM. Only you and your authorized AI agents can decrypt it.';
+        document.getElementById('encryptionDesc').textContent = 'Your data is encrypted with AES-256-GCM. Encryption happens locally—your passphrase never reaches the server.';
 
-        // Show MCP config with passphrase
+        // Show MCP config with local proxy
         document.getElementById('mcpConfig').textContent = JSON.stringify({
           "cosimo": {
-            "type": "http",
-            "url": `${baseUrl}/mcp`,
-            "headers": {
-              "x-api-key": currentUser.api_key,
-              "x-passphrase": "YOUR_PASSPHRASE"
+            "command": "npx",
+            "args": ["-y", "cosimo"],
+            "env": {
+              "COSIMO_API_KEY": currentUser.api_key,
+              "COSIMO_PASSPHRASE": "YOUR_PASSPHRASE"
             }
           }
         }, null, 2);
-        mcpNote.innerHTML = '<strong>Note:</strong> Replace <code>YOUR_PASSPHRASE</code> with your encryption passphrase.';
+        mcpNote.innerHTML = '<strong>Note:</strong> Replace <code>YOUR_PASSPHRASE</code> with your encryption passphrase. Claude Code spawns a local server that encrypts before sending.';
 
-        document.getElementById('curlExample').textContent = `curl -X POST ${baseUrl}/mcp/execute \\
-  -H "x-api-key: ${currentUser.api_key}" \\
-  -H "x-passphrase: YOUR_PASSPHRASE" \\
-  -H "Content-Type: application/json" \\
-  -d '{"tool": "cosimo_get"}'`;
+        document.getElementById('curlExample').textContent = `# Direct API (for testing only - passphrase sent to server)
+curl ${baseUrl}/api/blob \\
+  -H "x-api-key: ${currentUser.api_key}"`;
       } else {
         section.classList.remove('enabled');
         badge.textContent = 'Disabled';
@@ -336,19 +335,17 @@
         // Show MCP config without passphrase
         document.getElementById('mcpConfig').textContent = JSON.stringify({
           "cosimo": {
-            "type": "http",
-            "url": `${baseUrl}/mcp`,
-            "headers": {
-              "x-api-key": currentUser.api_key
+            "command": "npx",
+            "args": ["-y", "cosimo"],
+            "env": {
+              "COSIMO_API_KEY": currentUser.api_key
             }
           }
         }, null, 2);
-        mcpNote.textContent = 'Encryption is disabled. Enable it in the Account section above for enhanced security.';
+        mcpNote.textContent = 'Enable encryption above for true end-to-end security.';
 
-        document.getElementById('curlExample').textContent = `curl -X POST ${baseUrl}/mcp/execute \\
-  -H "x-api-key: ${currentUser.api_key}" \\
-  -H "Content-Type: application/json" \\
-  -d '{"tool": "cosimo_get"}'`;
+        document.getElementById('curlExample').textContent = `curl ${baseUrl}/api/blob \\
+  -H "x-api-key: ${currentUser.api_key}"`;
       }
     }
 

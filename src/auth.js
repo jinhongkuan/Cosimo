@@ -203,10 +203,22 @@ authRouter.post('/regenerate-key', authMiddleware, async (req, res) => {
   }
 });
 
-// Auth middleware (cookie JWT or Bearer API key)
+// Auth middleware (cookie JWT, Bearer API key, or x-api-key header)
 export async function authMiddleware(req, res, next) {
   let token = req.cookies[COOKIE_NAME];
 
+  // Check x-api-key header first (for MCP client)
+  const xApiKey = req.headers['x-api-key'];
+  if (xApiKey) {
+    const user = await queryOne('SELECT id, api_key FROM users WHERE api_key = $1', [xApiKey]);
+    if (user) {
+      req.userId = user.id;
+      req.apiKey = user.api_key;
+      return next();
+    }
+  }
+
+  // Check Bearer token
   const authHeader = req.headers.authorization;
   if (authHeader?.startsWith('Bearer ')) {
     const apiKey = authHeader.slice(7);

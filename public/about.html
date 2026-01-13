@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>About - Cosimo</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+      min-height: 100vh;
+      color: #e4e4e7;
+    }
+    header {
+      padding: 20px 32px;
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    h1 {
+      font-size: 24px;
+      background: linear-gradient(135deg, #818cf8, #c084fc);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .nav { display: flex; gap: 16px; }
+    .nav a { color: #a1a1aa; text-decoration: none; font-size: 13px; }
+    .nav a:hover { color: white; }
+    main {
+      max-width: 640px;
+      margin: 48px auto;
+      padding: 0 24px;
+    }
+    .section {
+      margin-bottom: 48px;
+    }
+    .section-title {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      color: #818cf8;
+      margin-bottom: 16px;
+    }
+    h2 {
+      font-size: 20px;
+      font-weight: 600;
+      color: #f4f4f5;
+      margin-bottom: 12px;
+    }
+    .what-how {
+      display: grid;
+      gap: 16px;
+    }
+    .what-how-item {
+      background: rgba(255,255,255,0.03);
+      border: 1px solid rgba(255,255,255,0.06);
+      border-radius: 12px;
+      padding: 20px;
+    }
+    .what-how-item.what {
+      border-left: 3px solid #818cf8;
+    }
+    .what-how-item.how {
+      border-left: 3px solid #22c55e;
+    }
+    .label {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 8px;
+    }
+    .what .label { color: #818cf8; }
+    .how .label { color: #22c55e; }
+    .what-how-item p {
+      color: #a1a1aa;
+      font-size: 14px;
+      line-height: 1.6;
+    }
+    .diagram {
+      background: rgba(0,0,0,0.3);
+      border-radius: 8px;
+      padding: 20px;
+      font-family: monospace;
+      font-size: 12px;
+      color: #71717a;
+      overflow-x: auto;
+      white-space: pre;
+      line-height: 1.5;
+    }
+    .diagram .highlight { color: #818cf8; }
+    .diagram .highlight-green { color: #22c55e; }
+    .footer {
+      text-align: center;
+      padding: 32px;
+      color: #52525b;
+      font-size: 12px;
+    }
+    .footer a { color: #818cf8; text-decoration: none; }
+    .footer a:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Cosimo</h1>
+    <div class="nav">
+      <a href="/app">App</a>
+      <a href="/dashboard">Dashboard</a>
+    </div>
+  </header>
+
+  <main>
+    <div class="section">
+      <div class="section-title">The Problem</div>
+      <h2>Semantic Gap</h2>
+      <p style="color:#a1a1aa; line-height:1.6; margin-bottom:20px;">
+        Goals get lost in translation. What you want to achieve (<em>objectives</em>) and how you'll get there (<em>deliverables</em>) live in different mental spaces. Traditional task managers track actions but lose the <em>why</em>.
+      </p>
+      <div class="what-how">
+        <div class="what-how-item what">
+          <div class="label">What it does</div>
+          <p>Cosimo captures the semantic bridge between objectives and deliverables—the reasoning that explains why an action achieves a goal.</p>
+        </div>
+        <div class="what-how-item how">
+          <div class="label">How it works</div>
+          <p>When deliverables link to multiple objectives, Cosimo surfaces high-leverage actions. One task that advances three goals gets prioritized over three tasks that each advance one.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">Security</div>
+      <h2>End-to-End Encryption</h2>
+      <div class="what-how">
+        <div class="what-how-item what">
+          <div class="label">What it does</div>
+          <p>Your data is encrypted before it leaves your device. The server only stores encrypted blobs—even we can't read your goals.</p>
+        </div>
+        <div class="what-how-item how">
+          <div class="label">How it works</div>
+          <p>Claude Code/Desktop spawns a local MCP server that handles AES-256 encryption. Your passphrase stays on your machine as an environment variable.</p>
+        </div>
+      </div>
+      <div class="diagram" style="margin-top:20px;">
+<span class="highlight">Claude Code</span> ──stdio──► <span class="highlight-green">cosimo-mcp</span> ──HTTPS──► Server
+                       <span class="highlight-green">↑ encrypts here</span>         <span style="color:#71717a">↑ stores blobs</span></div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">Part of</div>
+      <h2>The Bicameral Project</h2>
+      <p style="color:#a1a1aa; line-height:1.6;">
+        Closing the gap between <em>"what it does"</em> and <em>"how it works"</em>—in products, in teams, in markets. When these two vocabularies diverge, promises break and trust erodes. Cosimo is one tool in that mission.
+      </p>
+    </div>
+  </main>
+
+  <div class="footer">
+    <a href="https://github.com/jinhongkuan">Bicameral</a>
+  </div>
+</body>
+</html>

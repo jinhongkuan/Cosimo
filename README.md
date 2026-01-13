@@ -16,72 +16,58 @@ Cosimo makes this bridge explicit. When an AI assistant helps you plan, it doesn
 ## How It Works
 
 ```
-┌────────────────┐         MCP          ┌────────────────┐
-│  Claude Code   │ ───────────────────► │     Cosimo     │
-│  or Desktop    │  (API Key + E2E Enc) │     Server     │
-└────────────────┘                      └───────┬────────┘
-                                                │
-                                                ▼
-                                        ┌────────────────┐
-                                        │   Dashboard    │
-                                        │  (Real-time)   │
-                                        └────────────────┘
+┌────────────────┐                           ┌────────────────┐
+│  Claude Code   │ ──stdio──► cosimo-mcp ───►│     Cosimo     │
+│  or Desktop    │           (local, E2E)    │     Server     │
+└────────────────┘                           └───────┬────────┘
+        │                                            │
+        │  Encryption/decryption                     │  Stores encrypted
+        │  happens here (your machine)               │  blobs only
+        │                                            │
+        └────────────────────────────────────────────┴──► Dashboard
 ```
 
-Your AI assistant syncs goals to Cosimo via MCP. View them anytime on the dashboard.
+Your AI assistant syncs goals to Cosimo via a local MCP server. The local server handles encryption — your passphrase never leaves your machine.
 
-## Security: End-to-End Encryption
+## Security: True End-to-End Encryption
 
-Cosimo uses **AES-256-GCM encryption** with a user-provided passphrase:
+**What it does**: Your data is encrypted before it leaves your device.
 
-- Your passphrase is **never stored** on the server
-- Data is encrypted before storage and decrypted only with your passphrase
-- Even server administrators cannot read your data
-- Both dashboard and AI agents need the passphrase to access data
+**How it works**: The `cosimo-mcp` package runs locally on your machine. It encrypts your data with AES-256-GCM using your passphrase before sending anything to the server. The server only ever sees encrypted blobs — even server administrators cannot read your data.
+
+- Passphrase stays on your machine (in environment variable)
+- Encryption/decryption happens locally
+- Server stores opaque encrypted strings
+- Dashboard decrypts in your browser
 
 ## Setup
 
 ### 1. Create an Account
 
-Go to [cosimo.bicameral-ai.com](https://cosimo.bicameral-ai.com) and sign in with Google.
+Go to [cosimo.bicameral-ai.com](https://cosimo.bicameral-ai.com) and sign in with Google. Copy your API key (`csk_...`) from the dashboard.
 
-### 2. Set Up Your Passphrase
+### 2. Configure Claude Code
 
-On first login, you'll be prompted to create an encryption passphrase. This passphrase:
-- Encrypts all your goal data
-- Is required for dashboard access and MCP integration
-- **Cannot be recovered** if forgotten — store it safely!
-
-### 3. Configure Your Agent
-
-Copy your API key (`csk_...`) from the dashboard and add it to your MCP config.
-
-#### Claude Code
-
-Add to `~/.claude/settings.json`:
+Add to your Claude Code MCP settings:
 
 ```json
 {
   "mcpServers": {
     "cosimo": {
-      "type": "http",
-      "url": "https://cosimo.bicameral-ai.com/mcp",
-      "headers": {
-        "x-api-key": "csk_your_api_key_here",
-        "x-passphrase": "your_encryption_passphrase"
+      "command": "npx",
+      "args": ["-y", "cosimo"],
+      "env": {
+        "COSIMO_API_KEY": "csk_your_api_key_here",
+        "COSIMO_PASSPHRASE": "your_encryption_passphrase"
       }
     }
   }
 }
 ```
 
-#### Claude Desktop
+That's it. The MCP server runs locally, handles encryption, and syncs with Cosimo.
 
-1. Open Claude Desktop settings and go to **Extensions**
-2. Search for "Cosimo" and install
-3. Enter your API key and passphrase when prompted
-
-### 4. Start Using
+### 3. Start Using
 
 Ask Claude to help with your goals. Changes sync to your dashboard in real-time.
 
@@ -101,19 +87,26 @@ Claude will create an objective and help you break it down into deliverables, ca
 
 ### Time-Aware Prioritization
 
-Cosimo understands timing constraints. When you mention deadlines or availability, Claude will capture them:
+Cosimo understands timing constraints:
 
 > "I need to file taxes before April 15, but I can't start until I get my W-2s in late January"
 
-This creates a deliverable with `available_after: 2025-01-25` and `due_before: 2025-04-15`. The dashboard highlights:
-- **Approaching deadlines**: Objectives/deliverables due within 7 days get visual emphasis
-- **Actionable items**: Deliverables only appear as "ready" after their `available_after` date
-- **Overdue items**: Anything past its deadline is flagged
+This creates a deliverable with `available_after: 2025-01-25` and `due_before: 2025-04-15`. The dashboard highlights approaching deadlines and actionable items.
 
-View your goals on the dashboard with real-time updates as Claude modifies them.
+## Development
+
+```bash
+# Server
+npm install
+npm run dev
+
+# Local MCP package
+cd packages/cosimo-mcp
+npm install
+```
 
 ## License
 
-MIT License — Free to use, modify, and distribute. See [LICENSE](LICENSE) for details.
+MIT License — Free to use, modify, and distribute.
 
-Attribution appreciated: **Created by [jinhongkuan](https://github.com/jinhongkuan)**
+Created by [Bicameral](https://github.com/jinhongkuan)

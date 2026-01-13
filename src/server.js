@@ -75,6 +75,35 @@ async function saveUserData(userId, data, passphrase = null) {
   );
 }
 
+// Raw blob storage for E2E encrypted MCP clients
+// No server-side encryption/decryption - just stores/retrieves the raw string
+app.get('/api/blob', authMiddleware, async (req, res) => {
+  try {
+    const user = await queryOne('SELECT data FROM users WHERE id = $1', [req.userId]);
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    res.json({ data: user.data || null });
+  } catch (err) {
+    console.error('Get blob error:', err);
+    res.status(500).json({ error: 'Failed to retrieve data' });
+  }
+});
+
+app.put('/api/blob', authMiddleware, async (req, res) => {
+  const { data } = req.body;
+  if (data === undefined) return res.status(400).json({ error: 'data required' });
+
+  try {
+    await pool.query(
+      'UPDATE users SET data = $1, updated_at = NOW() WHERE id = $2',
+      [data, req.userId]
+    );
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Update blob error:', err);
+    res.status(500).json({ error: 'Failed to save data' });
+  }
+});
+
 // Get user's data
 app.get('/api/data', authMiddleware, async (req, res) => {
   const passphrase = req.headers['x-passphrase'] || req.query.passphrase;
