@@ -61,6 +61,10 @@
       font-size: 13px;
     }
     button:hover { background: rgba(255,255,255,0.15); color: white; }
+    .btn-primary { background: #818cf8; color: white; }
+    .btn-primary:hover { background: #6366f1; }
+    .btn-success { background: rgba(34, 197, 94, 0.2); color: #22c55e; }
+    .btn-success:hover { background: rgba(34, 197, 94, 0.3); }
     .btn-danger { background: rgba(239,68,68,0.2); color: #ef4444; }
     .btn-danger:hover { background: rgba(239,68,68,0.3); }
     .info { font-size: 13px; color: #71717a; margin-top: 12px; line-height: 1.6; }
@@ -84,6 +88,93 @@
     }
     .user-info { font-size: 14px; color: #a1a1aa; }
     .user-info strong { color: #f4f4f5; }
+    .user-profile {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+    .user-avatar {
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.1);
+      object-fit: cover;
+    }
+    .user-details { flex: 1; }
+    .user-name {
+      font-size: 16px;
+      font-weight: 600;
+      color: #f4f4f5;
+      margin-bottom: 4px;
+    }
+    .encryption-section {
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 12px;
+      padding: 20px;
+      margin-top: 16px;
+    }
+    .encryption-section.enabled {
+      border-color: rgba(34, 197, 94, 0.3);
+      background: rgba(34, 197, 94, 0.05);
+    }
+    .encryption-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 12px;
+    }
+    .encryption-status {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 14px;
+    }
+    .status-badge {
+      padding: 4px 10px;
+      border-radius: 12px;
+      font-size: 12px;
+      font-weight: 500;
+    }
+    .status-badge.enabled {
+      background: rgba(34, 197, 94, 0.2);
+      color: #22c55e;
+    }
+    .status-badge.disabled {
+      background: rgba(255,255,255,0.1);
+      color: #a1a1aa;
+    }
+    .passphrase-input {
+      display: flex;
+      gap: 12px;
+      margin-top: 16px;
+    }
+    .passphrase-input input {
+      flex: 1;
+      padding: 12px 16px;
+      border: 1px solid rgba(255,255,255,0.1);
+      background: rgba(0,0,0,0.3);
+      border-radius: 8px;
+      color: white;
+      font-size: 14px;
+    }
+    .passphrase-input input:focus {
+      outline: none;
+      border-color: #22c55e;
+    }
+    .warning {
+      background: rgba(251, 191, 36, 0.1);
+      border: 1px solid rgba(251, 191, 36, 0.3);
+      border-radius: 8px;
+      padding: 12px 16px;
+      margin-top: 12px;
+      font-size: 12px;
+      color: #fbbf24;
+    }
+    .error-msg {
+      color: #ef4444;
+      font-size: 13px;
+      margin-top: 8px;
+    }
   </style>
 </head>
 <body>
@@ -91,15 +182,58 @@
     <h1>Dashboard</h1>
     <div class="nav">
       <a href="/app">← Back to App</a>
-      <a href="#" id="logout">Logout</a>
+      <a href="/auth/logout">Logout</a>
     </div>
   </header>
 
   <main>
     <div class="card">
       <h2>Account</h2>
-      <p class="user-info">Email: <strong id="email">Loading...</strong></p>
-      <p class="user-info" style="margin-top:8px">Member since: <strong id="created">...</strong></p>
+      <div class="user-profile">
+        <img id="avatar" class="user-avatar" src="" alt="Avatar" style="display:none">
+        <div class="user-details">
+          <p class="user-name" id="name">Loading...</p>
+          <p class="user-info">Email: <strong id="email">...</strong></p>
+          <p class="user-info" style="margin-top:4px">Member since: <strong id="created">...</strong></p>
+        </div>
+      </div>
+
+      <!-- Encryption Section -->
+      <div class="encryption-section" id="encryptionSection">
+        <div class="encryption-header">
+          <div class="encryption-status">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+              <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+            </svg>
+            <span>End-to-End Encryption</span>
+            <span class="status-badge" id="encryptionBadge">Disabled</span>
+          </div>
+        </div>
+        <p class="info" style="margin-top:0" id="encryptionDesc">
+          Enable encryption to protect your data with a passphrase. When enabled, your data is encrypted before storage and can only be decrypted with your passphrase.
+        </p>
+
+        <!-- Enable encryption form (shown when disabled) -->
+        <div id="enableEncryptionForm">
+          <div class="passphrase-input">
+            <input type="password" id="newPassphrase" placeholder="Enter passphrase (min 4 characters)">
+            <input type="password" id="confirmPassphrase" placeholder="Confirm passphrase">
+            <button class="btn-success" id="enableEncryptionBtn">Enable Encryption</button>
+          </div>
+          <div class="warning">
+            ⚠️ <strong>Important:</strong> If you forget your passphrase, your data cannot be recovered. Store it safely!
+          </div>
+          <div class="error-msg" id="encryptionError"></div>
+        </div>
+
+        <!-- Info shown when encryption is enabled -->
+        <div id="encryptionEnabledInfo" style="display:none">
+          <p class="info" style="margin-top:8px; color:#22c55e">
+            ✓ Your data is protected with AES-256-GCM encryption. Remember to add your passphrase to your MCP configuration.
+          </p>
+        </div>
+      </div>
     </div>
 
     <div class="card">
@@ -116,39 +250,144 @@
       <h2>MCP Integration</h2>
       <p class="info" style="margin-bottom:16px">Add this to your Claude Desktop or coding agent's MCP config:</p>
       <div class="mcp-config" id="mcpConfig">Loading...</div>
-      <p class="info" style="margin-top:16px">
-        Available tools: <code>cosimo_get</code>, <code>cosimo_update</code>, <code>cosimo_add_objective</code>, <code>cosimo_add_deliverable</code>
+      <p class="info" style="margin-top:16px" id="mcpNote"></p>
+      <p class="info" style="margin-top:8px">
+        Available tools: <code>cosimo_get</code>, <code>cosimo_set</code>, <code>cosimo_add_objective</code>, <code>cosimo_add_deliverable</code>, <code>cosimo_update_objective</code>, <code>cosimo_update_deliverable</code>, <code>cosimo_delete</code>
       </p>
     </div>
 
     <div class="card">
       <h2>API Usage</h2>
-      <p class="info" style="margin-bottom:12px">Example: Update via natural language</p>
-      <pre>curl -X POST <span id="baseUrl"></span>/api/update \
-  -H "Authorization: Bearer YOUR_API_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{"prompt": "add goal to learn Spanish"}'</pre>
+      <p class="info" style="margin-bottom:12px">Example: Get your data</p>
+      <pre id="curlExample">Loading...</pre>
     </div>
   </main>
 
   <script>
     const baseUrl = window.location.origin;
-    document.getElementById('baseUrl').textContent = baseUrl;
+    let currentUser = null;
 
     async function loadUser() {
       const res = await fetch('/auth/me');
       if (!res.ok) return window.location.href = '/';
-      const user = await res.json();
-      document.getElementById('email').textContent = user.email;
-      document.getElementById('created').textContent = new Date(user.created_at).toLocaleDateString();
-      document.getElementById('apiKey').textContent = user.api_key;
-      document.getElementById('mcpConfig').textContent = JSON.stringify({
-        "cosimo": {
-          "url": `${baseUrl}/mcp`,
-          "headers": { "x-api-key": user.api_key }
-        }
-      }, null, 2);
+      currentUser = await res.json();
+
+      // Display name
+      const displayName = currentUser.name || currentUser.email.split('@')[0];
+      document.getElementById('name').textContent = displayName;
+      document.getElementById('email').textContent = currentUser.email;
+      document.getElementById('created').textContent = new Date(currentUser.created_at).toLocaleDateString();
+
+      // Show avatar
+      if (currentUser.picture) {
+        const avatar = document.getElementById('avatar');
+        avatar.src = currentUser.picture;
+        avatar.style.display = 'block';
+      }
+
+      document.getElementById('apiKey').textContent = currentUser.api_key;
+
+      // Update encryption UI
+      updateEncryptionUI();
     }
+
+    function updateEncryptionUI() {
+      const section = document.getElementById('encryptionSection');
+      const badge = document.getElementById('encryptionBadge');
+      const enableForm = document.getElementById('enableEncryptionForm');
+      const enabledInfo = document.getElementById('encryptionEnabledInfo');
+      const mcpNote = document.getElementById('mcpNote');
+
+      if (currentUser.encryption_enabled) {
+        section.classList.add('enabled');
+        badge.textContent = 'Enabled';
+        badge.classList.remove('disabled');
+        badge.classList.add('enabled');
+        enableForm.style.display = 'none';
+        enabledInfo.style.display = 'block';
+        document.getElementById('encryptionDesc').textContent = 'Your data is encrypted with AES-256-GCM. Only you and your authorized AI agents can decrypt it.';
+
+        // Show MCP config with passphrase
+        document.getElementById('mcpConfig').textContent = JSON.stringify({
+          "cosimo": {
+            "type": "http",
+            "url": `${baseUrl}/mcp`,
+            "headers": {
+              "x-api-key": currentUser.api_key,
+              "x-passphrase": "YOUR_PASSPHRASE"
+            }
+          }
+        }, null, 2);
+        mcpNote.innerHTML = '<strong>Note:</strong> Replace <code>YOUR_PASSPHRASE</code> with your encryption passphrase.';
+
+        document.getElementById('curlExample').textContent = `curl -X POST ${baseUrl}/mcp/execute \\
+  -H "x-api-key: ${currentUser.api_key}" \\
+  -H "x-passphrase: YOUR_PASSPHRASE" \\
+  -H "Content-Type: application/json" \\
+  -d '{"tool": "cosimo_get"}'`;
+      } else {
+        section.classList.remove('enabled');
+        badge.textContent = 'Disabled';
+        badge.classList.remove('enabled');
+        badge.classList.add('disabled');
+        enableForm.style.display = 'block';
+        enabledInfo.style.display = 'none';
+
+        // Show MCP config without passphrase
+        document.getElementById('mcpConfig').textContent = JSON.stringify({
+          "cosimo": {
+            "type": "http",
+            "url": `${baseUrl}/mcp`,
+            "headers": {
+              "x-api-key": currentUser.api_key
+            }
+          }
+        }, null, 2);
+        mcpNote.textContent = 'Encryption is disabled. Enable it in the Account section above for enhanced security.';
+
+        document.getElementById('curlExample').textContent = `curl -X POST ${baseUrl}/mcp/execute \\
+  -H "x-api-key: ${currentUser.api_key}" \\
+  -H "Content-Type: application/json" \\
+  -d '{"tool": "cosimo_get"}'`;
+      }
+    }
+
+    // Enable encryption
+    document.getElementById('enableEncryptionBtn').addEventListener('click', async () => {
+      const passphrase = document.getElementById('newPassphrase').value;
+      const confirm = document.getElementById('confirmPassphrase').value;
+      const errorEl = document.getElementById('encryptionError');
+
+      if (passphrase.length < 4) {
+        errorEl.textContent = 'Passphrase must be at least 4 characters';
+        return;
+      }
+
+      if (passphrase !== confirm) {
+        errorEl.textContent = 'Passphrases do not match';
+        return;
+      }
+
+      try {
+        const res = await fetch('/auth/enable-encryption', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ passphrase })
+        });
+
+        const data = await res.json();
+        if (data.success) {
+          sessionStorage.setItem('cosimo_passphrase', passphrase);
+          alert('Encryption enabled! Your data is now protected.');
+          currentUser.encryption_enabled = true;
+          updateEncryptionUI();
+        } else {
+          errorEl.textContent = data.error;
+        }
+      } catch (err) {
+        errorEl.textContent = 'Failed to enable encryption';
+      }
+    });
 
     document.getElementById('copyKey').addEventListener('click', () => {
       navigator.clipboard.writeText(document.getElementById('apiKey').textContent);
@@ -157,17 +396,12 @@
     });
 
     document.getElementById('regenKey').addEventListener('click', async () => {
-      if (!confirm('Regenerate API key? Existing integrations will stop working.')) return;
+      if (!confirm('Regenerate API key? You will need to update your MCP configurations.')) return;
       const res = await fetch('/auth/regenerate-key', { method: 'POST' });
       const { apiKey } = await res.json();
+      currentUser.api_key = apiKey;
       document.getElementById('apiKey').textContent = apiKey;
-      loadUser();
-    });
-
-    document.getElementById('logout').addEventListener('click', async (e) => {
-      e.preventDefault();
-      await fetch('/auth/logout', { method: 'POST' });
-      window.location.href = '/';
+      updateEncryptionUI();
     });
 
     loadUser();

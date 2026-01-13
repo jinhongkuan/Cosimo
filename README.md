@@ -18,7 +18,7 @@ Cosimo makes this bridge explicit. When an AI assistant helps you plan, it doesn
 ```
 ┌────────────────┐         MCP          ┌────────────────┐
 │  Claude Code   │ ───────────────────► │     Cosimo     │
-│  or Desktop    │   (API Key Auth)     │     Server     │
+│  or Desktop    │  (API Key + E2E Enc) │     Server     │
 └────────────────┘                      └───────┬────────┘
                                                 │
                                                 ▼
@@ -30,13 +30,31 @@ Cosimo makes this bridge explicit. When an AI assistant helps you plan, it doesn
 
 Your AI assistant syncs goals to Cosimo via MCP. View them anytime on the dashboard.
 
+## Security: End-to-End Encryption
+
+Cosimo uses **AES-256-GCM encryption** with a user-provided passphrase:
+
+- Your passphrase is **never stored** on the server
+- Data is encrypted before storage and decrypted only with your passphrase
+- Even server administrators cannot read your data
+- Both dashboard and AI agents need the passphrase to access data
+
 ## Setup
 
 ### 1. Create an Account
 
-Go to [cosimo.bicameral-ai.com](https://cosimo.bicameral-ai.com) and register. Copy your API key (`csk_...`) from the dashboard.
+Go to [cosimo.bicameral-ai.com](https://cosimo.bicameral-ai.com) and sign in with Google.
 
-### 2. Configure Your Agent
+### 2. Set Up Your Passphrase
+
+On first login, you'll be prompted to create an encryption passphrase. This passphrase:
+- Encrypts all your goal data
+- Is required for dashboard access and MCP integration
+- **Cannot be recovered** if forgotten — store it safely!
+
+### 3. Configure Your Agent
+
+Copy your API key (`csk_...`) from the dashboard and add it to your MCP config.
 
 #### Claude Code
 
@@ -49,7 +67,8 @@ Add to `~/.claude/settings.json`:
       "type": "http",
       "url": "https://cosimo.bicameral-ai.com/mcp",
       "headers": {
-        "x-api-key": "csk_your_api_key_here"
+        "x-api-key": "csk_your_api_key_here",
+        "x-passphrase": "your_encryption_passphrase"
       }
     }
   }
@@ -60,9 +79,9 @@ Add to `~/.claude/settings.json`:
 
 1. Open Claude Desktop settings and go to **Extensions**
 2. Search for "Cosimo" and install
-3. Enter your API key when prompted
+3. Enter your API key and passphrase when prompted
 
-### 3. Start Using
+### 4. Start Using
 
 Ask Claude to help with your goals. Changes sync to your dashboard in real-time.
 

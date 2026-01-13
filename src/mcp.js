@@ -1,17 +1,76 @@
 import express from 'express';
-import { pool, queryOne } from './db.js';
+import { pool, queryOne, DEFAULT_DATA } from './db.js';
+import { encryptData, decryptData, isEncrypted, verifyPassphrase } from './crypto.js';
 
 export const mcpRouter = express.Router();
 
-async function apiKeyAuth(req, res, next) {
+// Auth middleware that validates API key and optionally passphrase
+async function mcpAuth(req, res, next) {
   const apiKey = req.headers['x-api-key'] || req.query.api_key;
-  if (!apiKey) return res.status(401).json({ error: 'API key required' });
+  const passphrase = req.headers['x-passphrase'] || req.query.passphrase;
 
-  const user = await queryOne('SELECT id FROM users WHERE api_key = $1', [apiKey]);
-  if (!user) return res.status(401).json({ error: 'Invalid API key' });
+  if (!apiKey) {
+    return res.status(401).json({ error: 'API key required' });
+  }
+
+  const user = await queryOne(
+    'SELECT id, api_key, encryption_enabled, passphrase_hash FROM users WHERE api_key = $1',
+    [apiKey]
+  );
+
+  if (!user) {
+    return res.status(401).json({ error: 'Invalid API key' });
+  }
+
+  // If encryption enabled, require passphrase
+  if (user.encryption_enabled) {
+    if (!passphrase) {
+      return res.status(401).json({
+        error: 'Passphrase required. Add x-passphrase header to your MCP configuration.',
+        code: 'PASSPHRASE_REQUIRED'
+      });
+    }
+
+    if (!verifyPassphrase(passphrase, user.passphrase_hash)) {
+      return res.status(401).json({
+        error: 'Invalid passphrase',
+        code: 'INVALID_PASSPHRASE'
+      });
+    }
+  }
 
   req.userId = user.id;
+  req.apiKey = user.api_key;
+  req.passphrase = passphrase;
+  req.encryptionEnabled = user.encryption_enabled;
   next();
+}
+
+// Helper to get user data
+async function getUserData(userId, encryptionEnabled, passphrase) {
+  const user = await queryOne('SELECT data FROM users WHERE id = $1', [userId]);
+  if (!user || !user.data) return { ...DEFAULT_DATA };
+
+  if (encryptionEnabled && isEncrypted(user.data)) {
+    return decryptData(user.data, passphrase);
+  }
+
+  try {
+    return JSON.parse(user.data);
+  } catch {
+    return { ...DEFAULT_DATA };
+  }
+}
+
+// Helper to save user data
+async function saveUserData(userId, encryptionEnabled, passphrase, data) {
+  let dataToStore;
+  if (encryptionEnabled) {
+    dataToStore = encryptData(data, passphrase);
+  } else {
+    dataToStore = JSON.stringify(data);
+  }
+  await pool.query('UPDATE users SET data = $1, updated_at = NOW() WHERE id = $2', [dataToStore, userId]);
 }
 
 mcpRouter.get('/manifest', (req, res) => {
@@ -20,6 +79,15 @@ mcpRouter.get('/manifest', (req, res) => {
     version: '1.0.0',
     description: 'Goal alignment system - bridge objectives ("what it does") and deliverables ("how it works")',
     instructions: `You are helping the user manage their goals in Cosimo, a system that bridges high-level objectives with concrete deliverables.
+
+## Authentication
+
+This MCP server requires an API key (x-api-key header).
+
+If the user has enabled end-to-end encryption, you also need to provide:
+- **Passphrase** (x-passphrase header) - decrypts the data
+
+If encryption is not enabled, only the API key is needed.
 
 ## Core Concepts
 
@@ -174,19 +242,20 @@ When a user mentions timing context (e.g., "I'm on a trip until Friday", "after 
   });
 });
 
-mcpRouter.post('/execute', apiKeyAuth, async (req, res) => {
+mcpRouter.post('/execute', mcpAuth, async (req, res) => {
   const { tool, parameters = {} } = req.body;
-  const user = await queryOne('SELECT data FROM users WHERE id = $1', [req.userId]);
-  let data = user.data;
 
   try {
+    let data = await getUserData(req.userId, req.encryptionEnabled, req.passphrase);
+
     switch (tool) {
       case 'cosimo_get':
         return res.json({ success: true, data });
 
       case 'cosimo_set':
         data = { ...parameters.data, lastUpdated: new Date().toISOString() };
-        break;
+        await saveUserData(req.userId, req.encryptionEnabled, req.passphrase, data);
+        return res.json({ success: true, data });
 
       case 'cosimo_add_objective': {
         const maxId = data.objectives.length ? Math.max(...data.objectives.map(o => parseInt(o.id.split('-')[1]))) : 0;
@@ -201,6 +270,7 @@ mcpRouter.post('/execute', apiKeyAuth, async (req, res) => {
         };
         data.objectives.push(newObj);
         data.lastUpdated = new Date().toISOString();
+        await saveUserData(req.userId, req.encryptionEnabled, req.passphrase, data);
         return res.json({ success: true, created: newObj, data });
       }
 
@@ -226,8 +296,7 @@ mcpRouter.post('/execute', apiKeyAuth, async (req, res) => {
           data.relationships[`${parameters.objectiveId}:${newDel.id}`] = parameters.relationship;
         }
         data.lastUpdated = new Date().toISOString();
-
-        await pool.query('UPDATE users SET data = $1, updated_at = NOW() WHERE id = $2', [JSON.stringify(data), req.userId]);
+        await saveUserData(req.userId, req.encryptionEnabled, req.passphrase, data);
         return res.json({ success: true, created: newDel, data });
       }
 
@@ -242,7 +311,8 @@ mcpRouter.post('/execute', apiKeyAuth, async (req, res) => {
           ...(parameters.impact && { impact: parameters.impact })
         });
         data.lastUpdated = new Date().toISOString();
-        break;
+        await saveUserData(req.userId, req.encryptionEnabled, req.passphrase, data);
+        return res.json({ success: true, data });
       }
 
       case 'cosimo_update_deliverable': {
@@ -257,7 +327,8 @@ mcpRouter.post('/execute', apiKeyAuth, async (req, res) => {
           ...(parameters.due_before && { due_before: parameters.due_before })
         });
         data.lastUpdated = new Date().toISOString();
-        break;
+        await saveUserData(req.userId, req.encryptionEnabled, req.passphrase, data);
+        return res.json({ success: true, data });
       }
 
       case 'cosimo_delete': {
@@ -280,15 +351,13 @@ mcpRouter.post('/execute', apiKeyAuth, async (req, res) => {
           });
         }
         data.lastUpdated = new Date().toISOString();
-        break;
+        await saveUserData(req.userId, req.encryptionEnabled, req.passphrase, data);
+        return res.json({ success: true, data });
       }
 
       default:
         return res.status(400).json({ error: `Unknown tool: ${tool}` });
     }
-
-    await pool.query('UPDATE users SET data = $1, updated_at = NOW() WHERE id = $2', [JSON.stringify(data), req.userId]);
-    res.json({ success: true, data });
   } catch (err) {
     console.error('MCP error:', err);
     res.status(500).json({ error: err.message });
