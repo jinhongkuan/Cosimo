@@ -29,8 +29,23 @@ const auth0Config = {
     scope: 'openid email profile',
     connection: 'google-oauth2'
   },
-  afterCallback: async (req, res, session) => {
-    const { sub: auth0Id, email, name, picture } = session;
+  afterCallback: async (req, res, session, state) => {
+    // Decode the id_token JWT to get user claims
+    // The id_token is a JWT string - we need to decode it (verification already done by Auth0)
+    const idToken = session.id_token;
+    const payload = JSON.parse(Buffer.from(idToken.split('.')[1], 'base64').toString());
+
+    const auth0Id = payload.sub;
+    const email = payload.email;
+    const name = payload.name || payload.nickname;
+    const picture = payload.picture;
+
+    console.log('Decoded claims:', { auth0Id, email, name, picture });
+
+    if (!email) {
+      console.error('No email in id_token payload:', payload);
+      throw new Error('Email not provided by Auth0. Check your Auth0 settings.');
+    }
 
     try {
       let user = await queryOne('SELECT * FROM users WHERE auth0_id = $1', [auth0Id]);

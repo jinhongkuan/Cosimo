@@ -55,6 +55,10 @@ export async function initDb() {
       IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='password') THEN
         ALTER TABLE users ALTER COLUMN password DROP NOT NULL;
       END IF;
+      -- Convert data column from JSON/JSONB to TEXT if needed (for encryption support)
+      IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='data' AND data_type IN ('json', 'jsonb')) THEN
+        ALTER TABLE users ALTER COLUMN data TYPE TEXT USING data::TEXT;
+      END IF;
     END $$;
   `);
 
