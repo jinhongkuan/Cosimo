@@ -68,6 +68,15 @@ app.get('/dashboard', optionalAuth, (req, res) => {
   res.sendFile(join(__dirname, '../public/dashboard.html'));
 });
 
-initDb().then(() => {
-  app.listen(PORT, () => console.log(`Cosimo running on http://localhost:${PORT}`));
+// Healthcheck endpoint
+app.get('/health', (req, res) => {
+  res.json({ status: 'ok' });
+});
+
+// Start server first, then init DB
+app.listen(PORT, () => {
+  console.log(`Cosimo running on http://localhost:${PORT}`);
+  initDb()
+    .then(() => console.log('Database connected'))
+    .catch(err => console.error('Database init failed:', err.message));
 });

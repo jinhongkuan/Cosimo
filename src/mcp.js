@@ -25,10 +25,14 @@ mcpRouter.get('/manifest', (req, res) => {
 
 **Objectives** = "What it does" — user-facing goals/outcomes
 - Ranked by urgency (0-100): deadline proximity + impact
+- Have optional \`deadline\` (ISO date) — items bubble up on dashboard as deadline approaches
 - Examples: "Get healthy", "Launch MVP", "Build community"
 
 **Deliverables** = "How it works" — concrete actions/tasks
 - Ranked by feasibility (0-100): higher = easier (fewer blockers, lower complexity)
+- Have optional time constraints:
+  - \`available_after\`: Date when this becomes actionable (e.g., "after Jan 15" for post-trip tasks)
+  - \`due_before\`: Hard deadline for this specific action
 - Examples: "Schedule PCP appointment", "Build API", "Host first meetup"
 
 **Relationships** = Semantic bridges explaining HOW a deliverable achieves an objective
@@ -42,6 +46,10 @@ mcpRouter.get('/manifest', (req, res) => {
 3. For deliverables, always link to a relevant objective
 4. Write meaningful relationship descriptions that explain the "semantic bridge"
 5. Set appropriate urgency/feasibility scores based on context
+6. **Ask about timing**: If user mentions a goal/task, probe for time constraints:
+   - "When do you need this done by?" → set deadline/due_before
+   - "When can you start on this?" → set available_after
+   - "Is this blocked by anything time-wise?" → helps set feasibility
 
 ## Scoring Guidelines
 
@@ -55,7 +63,16 @@ Feasibility (deliverables):
 - 90-100: Can do today, no blockers
 - 70-89: Can do this week, minor prep needed
 - 50-69: Requires coordination or has dependencies
-- <50: Blocked or highly complex`,
+- <50: Blocked or highly complex
+
+## Time-Aware Prioritization
+
+The dashboard highlights items based on time pressure:
+- Objectives with deadlines within 7 days get visual emphasis
+- Deliverables only show as "actionable" after their available_after date
+- Items past their due_before date are flagged as overdue
+
+When a user mentions timing context (e.g., "I'm on a trip until Friday", "after I get back", "before my appointment on the 20th"), capture this in the appropriate date fields.`,
     tools: [
       {
         name: 'cosimo_get',
@@ -102,7 +119,9 @@ Feasibility (deliverables):
             feasibility: { type: 'number', minimum: 0, maximum: 100, description: 'Higher = easier to do' },
             complexity: { type: 'string', enum: ['low', 'medium', 'high'] },
             objectiveId: { type: 'string', description: 'ID of objective to link (e.g., obj-1)' },
-            relationship: { type: 'string', description: 'Semantic bridge: how this action achieves the goal' }
+            relationship: { type: 'string', description: 'Semantic bridge: how this action achieves the goal' },
+            available_after: { type: 'string', format: 'date', description: 'Date when this becomes actionable (ISO format)' },
+            due_before: { type: 'string', format: 'date', description: 'Hard deadline for this action (ISO format)' }
           },
           required: ['title', 'objectiveId']
         }
@@ -133,7 +152,9 @@ Feasibility (deliverables):
             title: { type: 'string' },
             description: { type: 'string' },
             feasibility: { type: 'number' },
-            complexity: { type: 'string' }
+            complexity: { type: 'string' },
+            available_after: { type: 'string', format: 'date', description: 'Date when this becomes actionable' },
+            due_before: { type: 'string', format: 'date', description: 'Hard deadline for this action' }
           },
           required: ['id']
         }
@@ -192,7 +213,9 @@ mcpRouter.post('/execute', apiKeyAuth, async (req, res) => {
           feasibility: parameters.feasibility ?? 50,
           complexity: parameters.complexity || 'medium',
           blockers: [],
-          linkedObjectives: [parameters.objectiveId]
+          linkedObjectives: [parameters.objectiveId],
+          ...(parameters.available_after && { available_after: parameters.available_after }),
+          ...(parameters.due_before && { due_before: parameters.due_before })
         };
         data.deliverables.push(newDel);
 
@@ -229,7 +252,9 @@ mcpRouter.post('/execute', apiKeyAuth, async (req, res) => {
           ...(parameters.title && { title: parameters.title }),
           ...(parameters.description && { description: parameters.description }),
           ...(parameters.feasibility !== undefined && { feasibility: parameters.feasibility }),
-          ...(parameters.complexity && { complexity: parameters.complexity })
+          ...(parameters.complexity && { complexity: parameters.complexity }),
+          ...(parameters.available_after && { available_after: parameters.available_after }),
+          ...(parameters.due_before && { due_before: parameters.due_before })
         });
         data.lastUpdated = new Date().toISOString();
         break;
