@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cosimo</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+      min-height: 100vh;
+      color: #e4e4e7;
+    }
+    header {
+      padding: 20px 32px;
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    h1 {
+      font-size: 24px;
+      background: linear-gradient(135deg, #818cf8, #c084fc);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .subtitle { font-size: 13px; color: #71717a; }
+    .nav { display: flex; gap: 16px; align-items: center; }
+    .nav a { color: #a1a1aa; text-decoration: none; font-size: 13px; }
+    .nav a:hover { color: white; }
+    .status { display: flex; align-items: center; gap: 8px; font-size: 12px; color: #71717a; }
+    .status-dot { width: 8px; height: 8px; border-radius: 50%; background: #22c55e; }
+    main {
+      display: flex;
+      padding: 32px;
+      gap: 100px;
+      max-width: 1400px;
+      margin: 0 auto;
+      position: relative;
+    }
+    .column { flex: 1; z-index: 2; }
+    .column-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 20px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid rgba(129, 140, 248, 0.2);
+    }
+    .column-dot { width: 12px; height: 12px; border-radius: 50%; }
+    .column-title { font-size: 14px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; }
+    .column-sub { font-size: 11px; color: #71717a; font-style: italic; }
+    .obj .column-dot, .obj .column-title { color: #818cf8; background: #818cf8; }
+    .obj .column-title { background: none; }
+    .del .column-dot, .del .column-title { color: #c084fc; background: #c084fc; }
+    .del .column-title { background: none; }
+    .del .column-header { border-color: rgba(192, 132, 252, 0.2); }
+    .bubble {
+      padding: 16px 20px;
+      border-radius: 16px;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      margin-bottom: 12px;
+      backdrop-filter: blur(10px);
+    }
+    .bubble:hover { transform: scale(1.02); }
+    .bubble.dimmed { opacity: 0.3; }
+    .bubble.selected { border-color: #818cf8 !important; box-shadow: 0 0 20px rgba(129, 140, 248, 0.5); }
+    .bubble-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px; }
+    .bubble-title { font-size: 15px; font-weight: 600; color: #f4f4f5; }
+    .bubble-badge { font-size: 11px; padding: 2px 8px; border-radius: 12px; font-weight: 600; color: #1a1a2e; }
+    .bubble-desc { font-size: 13px; color: #a1a1aa; line-height: 1.4; }
+    .bubble-meta { margin-top: 8px; font-size: 11px; color: #71717a; }
+    .bubble-blocker { color: #f87171; }
+    #svg-container { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 1; }
+    #panel {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: linear-gradient(180deg, rgba(15, 23, 42, 0.95), rgba(15, 23, 42, 0.98));
+      backdrop-filter: blur(20px);
+      border-top: 1px solid rgba(129, 140, 248, 0.3);
+      padding: 24px 32px;
+      z-index: 100;
+      transform: translateY(100%);
+      transition: transform 0.3s ease;
+    }
+    #panel.open { transform: translateY(0); }
+    .panel-inner { max-width: 1200px; margin: 0 auto; }
+    .panel-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 16px; }
+    .panel-type { font-size: 11px; text-transform: uppercase; letter-spacing: 1px; font-weight: 600; }
+    .panel-title { font-size: 20px; font-weight: 600; color: #f4f4f5; margin-top: 4px; }
+    .panel-close { background: rgba(255,255,255,0.1); border: none; border-radius: 8px; padding: 8px 12px; color: #a1a1aa; cursor: pointer; }
+    .panel-desc { color: #a1a1aa; font-size: 14px; margin-bottom: 20px; line-height: 1.5; }
+    .panel-section { border-top: 1px solid rgba(255,255,255,0.1); padding-top: 16px; }
+    .panel-section-title { font-size: 13px; font-weight: 600; color: #71717a; margin-bottom: 12px; text-transform: uppercase; letter-spacing: 0.5px; }
+    .relationship {
+      background: rgba(255,255,255,0.05);
+      border-radius: 12px;
+      padding: 16px;
+      border: 1px solid rgba(255,255,255,0.08);
+      margin-bottom: 12px;
+    }
+    .relationship-header { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+    .relationship-type { font-size: 12px; font-weight: 600; }
+    .relationship-name { font-size: 14px; font-weight: 500; color: #f4f4f5; }
+    .relationship-text { font-size: 13px; color: #a1a1aa; line-height: 1.6; font-style: italic; }
+  </style>
+</head>
+<body>
+  <header>
+    <div>
+      <h1>Cosimo</h1>
+      <p class="subtitle">Bridging Goals & Actions</p>
+    </div>
+    <div class="nav">
+      <div class="status"><div class="status-dot" id="statusDot"></div><span id="statusText">Connecting...</span></div>
+      <a href="/dashboard">Dashboard</a>
+      <a href="#" id="logout">Logout</a>
+    </div>
+  </header>
+
+  <main id="main">
+    <svg id="svg-container"><defs>
+      <linearGradient id="lineGrad" x1="0%" x2="100%"><stop offset="0%" stop-color="#818cf8" stop-opacity="0.6"/><stop offset="100%" stop-color="#c084fc" stop-opacity="0.6"/></linearGradient>
+      <linearGradient id="lineGradHL" x1="0%" x2="100%"><stop offset="0%" stop-color="#818cf8"/><stop offset="100%" stop-color="#c084fc"/></linearGradient>
+    </defs></svg>
+
+    <div class="column obj">
+      <div class="column-header">
+        <div class="column-dot"></div>
+        <span class="column-title">Objectives</span>
+        <span class="column-sub">"What it does" — by urgency</span>
+      </div>
+      <div id="objectives"></div>
+    </div>
+
+    <div class="column del">
+      <div class="column-header">
+        <div class="column-dot"></div>
+        <span class="column-title">Deliverables</span>
+        <span class="column-sub">"How it works" — by feasibility</span>
+      </div>
+      <div id="deliverables"></div>
+    </div>
+  </main>
+
+  <div id="panel">
+    <div class="panel-inner">
+      <div class="panel-header">
+        <div><span class="panel-type" id="panelType"></span><h2 class="panel-title" id="panelTitle"></h2></div>
+        <button class="panel-close" id="panelClose">Close</button>
+      </div>
+      <p class="panel-desc" id="panelDesc"></p>
+      <div class="panel-section">
+        <h3 class="panel-section-title">Semantic Bridge</h3>
+        <div id="relationships"></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let data = null;
+    let selected = null;
+    let hovered = null;
+
+    const urgencyColor = u => u >= 80 ? ['rgba(239,68,68,0.2)', '#ef4444'] : u >= 60 ? ['rgba(251,191,36,0.2)', '#fbbf24'] : ['rgba(34,197,94,0.2)', '#22c55e'];
+    const feasColor = f => f >= 80 ? ['rgba(34,197,94,0.2)', '#22c55e'] : f >= 60 ? ['rgba(251,191,36,0.2)', '#fbbf24'] : ['rgba(239,68,68,0.2)', '#ef4444'];
+
+    function render() {
+      if (!data) return;
+      const objs = [...data.objectives].sort((a, b) => b.urgency - a.urgency);
+      const dels = [...data.deliverables].sort((a, b) => b.feasibility - a.feasibility);
+
+      const linkedIds = new Set();
+      if (hovered || selected) {
+        const item = hovered || selected;
+        linkedIds.add(item.id);
+        (item.linkedDeliverables || []).forEach(id => linkedIds.add(id));
+        (item.linkedObjectives || []).forEach(id => linkedIds.add(id));
+      }
+      const anyActive = hovered || selected;
+
+      document.getElementById('objectives').innerHTML = objs.map(o => {
+        const [bg, border] = urgencyColor(o.urgency);
+        const dimmed = anyActive && !linkedIds.has(o.id) ? 'dimmed' : '';
+        const sel = selected?.id === o.id ? 'selected' : '';
+        return `<div class="bubble ${dimmed} ${sel}" data-id="${o.id}" style="background:${bg};border:2px solid ${sel ? '#818cf8' : border}">
+          <div class="bubble-header"><span class="bubble-title">${o.title}</span><span class="bubble-badge" style="background:${border}">${o.urgency}%</span></div>
+          <p class="bubble-desc">${o.description}</p>
+          ${o.deadline ? `<p class="bubble-meta">Deadline: ${o.deadline}</p>` : ''}
+        </div>`;
+      }).join('');
+
+      document.getElementById('deliverables').innerHTML = dels.map(d => {
+        const [bg, border] = feasColor(d.feasibility);
+        const dimmed = anyActive && !linkedIds.has(d.id) ? 'dimmed' : '';
+        const sel = selected?.id === d.id ? 'selected' : '';
+        return `<div class="bubble ${dimmed} ${sel}" data-id="${d.id}" style="background:${bg};border:2px solid ${sel ? '#818cf8' : border}">
+          <div class="bubble-header"><span class="bubble-title">${d.title}</span><span class="bubble-badge" style="background:${border}">${d.feasibility}%</span></div>
+          <p class="bubble-desc">${d.description}</p>
+          ${d.blockers?.length ? `<p class="bubble-meta bubble-blocker">Blocked by: ${d.blockers.length} item(s)</p>` : ''}
+        </div>`;
+      }).join('');
+
+      drawLines();
+      bindEvents();
+    }
+
+    function drawLines() {
+      const svg = document.getElementById('svg-container');
+      const main = document.getElementById('main');
+      const rect = main.getBoundingClientRect();
+      svg.innerHTML = `<defs><linearGradient id="lineGrad" x1="0%" x2="100%"><stop offset="0%" stop-color="#818cf8" stop-opacity="0.6"/><stop offset="100%" stop-color="#c084fc" stop-opacity="0.6"/></linearGradient><linearGradient id="lineGradHL" x1="0%" x2="100%"><stop offset="0%" stop-color="#818cf8"/><stop offset="100%" stop-color="#c084fc"/></linearGradient></defs>`;
+
+      const linkedIds = new Set();
+      if (hovered || selected) {
+        const item = hovered || selected;
+        linkedIds.add(item.id);
+        (item.linkedDeliverables || []).forEach(id => linkedIds.add(id));
+        (item.linkedObjectives || []).forEach(id => linkedIds.add(id));
+      }
+      const anyActive = hovered || selected;
+
+      data.objectives.forEach(obj => {
+        (obj.linkedDeliverables || []).forEach(delId => {
+          const objEl = document.querySelector(`[data-id="${obj.id}"]`);
+          const delEl = document.querySelector(`[data-id="${delId}"]`);
+          if (!objEl || !delEl) return;
+          const oR = objEl.getBoundingClientRect();
+          const dR = delEl.getBoundingClientRect();
+          const x1 = oR.right - rect.left, y1 = oR.top + oR.height/2 - rect.top;
+          const x2 = dR.left - rect.left, y2 = dR.top + dR.height/2 - rect.top;
+          const mx = (x1 + x2) / 2;
+          const hl = linkedIds.has(obj.id) || linkedIds.has(delId);
+          const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+          path.setAttribute('d', `M${x1},${y1} C${mx},${y1} ${mx},${y2} ${x2},${y2}`);
+          path.setAttribute('fill', 'none');
+          path.setAttribute('stroke', hl ? 'url(#lineGradHL)' : 'url(#lineGrad)');
+          path.setAttribute('stroke-width', hl ? 3 : 1.5);
+          path.setAttribute('opacity', hl ? 1 : anyActive ? 0.15 : 0.4);
+          svg.appendChild(path);
+        });
+      });
+    }
+
+    function bindEvents() {
+      document.querySelectorAll('.bubble').forEach(el => {
+        el.addEventListener('mouseenter', () => {
+          hovered = findItem(el.dataset.id);
+          render();
+        });
+        el.addEventListener('mouseleave', () => { hovered = null; render(); });
+        el.addEventListener('click', () => {
+          const item = findItem(el.dataset.id);
+          selected = selected?.id === item.id ? null : item;
+          showPanel();
+          render();
+        });
+      });
+    }
+
+    function findItem(id) {
+      return data.objectives.find(o => o.id === id) || data.deliverables.find(d => d.id === id);
+    }
+
+    function showPanel() {
+      const panel = document.getElementById('panel');
+      if (!selected) { panel.classList.remove('open'); return; }
+      panel.classList.add('open');
+
+      const isObj = selected.id.startsWith('obj');
+      document.getElementById('panelType').textContent = isObj ? 'Objective' : 'Deliverable';
+      document.getElementById('panelType').style.color = isObj ? '#818cf8' : '#c084fc';
+      document.getElementById('panelTitle').textContent = selected.title;
+      document.getElementById('panelDesc').textContent = selected.description;
+
+      const linkedIds = isObj ? selected.linkedDeliverables : selected.linkedObjectives;
+      const linkedItems = isObj
+        ? data.deliverables.filter(d => linkedIds?.includes(d.id))
+        : data.objectives.filter(o => linkedIds?.includes(o.id));
+
+      document.getElementById('relationships').innerHTML = linkedItems.map(linked => {
+        const key = isObj ? `${selected.id}:${linked.id}` : `${linked.id}:${selected.id}`;
+        const rel = data.relationships[key] || 'Relationship pending...';
+        return `<div class="relationship">
+          <div class="relationship-header">
+            <span class="relationship-type" style="color:${isObj ? '#c084fc' : '#818cf8'}">${isObj ? 'Deliverable' : 'Objective'}:</span>
+            <span class="relationship-name">${linked.title}</span>
+          </div>
+          <p class="relationship-text">${rel}</p>
+        </div>`;
+      }).join('');
+    }
+
+    document.getElementById('panelClose').addEventListener('click', () => { selected = null; showPanel(); render(); });
+    document.getElementById('logout').addEventListener('click', async (e) => {
+      e.preventDefault();
+      await fetch('/auth/logout', { method: 'POST' });
+      window.location.href = '/';
+    });
+
+    // SSE for real-time updates
+    const evtSource = new EventSource('/api/stream');
+    evtSource.onmessage = (e) => {
+      const msg = JSON.parse(e.data);
+      data = msg.data;
+      document.getElementById('statusDot').style.background = '#22c55e';
+      document.getElementById('statusText').textContent = 'Synced';
+      render();
+    };
+    evtSource.onerror = () => {
+      document.getElementById('statusDot').style.background = '#ef4444';
+      document.getElementById('statusText').textContent = 'Disconnected';
+    };
+
+    window.addEventListener('resize', () => data && drawLines());
+  </script>
+</body>
+</html>

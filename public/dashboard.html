@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard - Cosimo</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+      min-height: 100vh;
+      color: #e4e4e7;
+    }
+    header {
+      padding: 20px 32px;
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    h1 {
+      font-size: 24px;
+      background: linear-gradient(135deg, #818cf8, #c084fc);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .nav { display: flex; gap: 16px; }
+    .nav a { color: #a1a1aa; text-decoration: none; font-size: 13px; }
+    .nav a:hover { color: white; }
+    main { max-width: 800px; margin: 40px auto; padding: 0 20px; }
+    .card {
+      background: rgba(255,255,255,0.05);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+    }
+    h2 { font-size: 16px; color: #818cf8; margin-bottom: 16px; }
+    .api-key-box {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+    }
+    .api-key {
+      flex: 1;
+      padding: 12px 16px;
+      background: rgba(0,0,0,0.3);
+      border-radius: 8px;
+      font-family: monospace;
+      font-size: 13px;
+      color: #22c55e;
+      word-break: break-all;
+    }
+    button {
+      padding: 10px 16px;
+      border: none;
+      background: rgba(255,255,255,0.1);
+      color: #a1a1aa;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 13px;
+    }
+    button:hover { background: rgba(255,255,255,0.15); color: white; }
+    .btn-danger { background: rgba(239,68,68,0.2); color: #ef4444; }
+    .btn-danger:hover { background: rgba(239,68,68,0.3); }
+    .info { font-size: 13px; color: #71717a; margin-top: 12px; line-height: 1.6; }
+    pre {
+      background: rgba(0,0,0,0.3);
+      border-radius: 8px;
+      padding: 16px;
+      font-size: 12px;
+      overflow-x: auto;
+      color: #a1a1aa;
+    }
+    code { color: #c084fc; }
+    .mcp-config {
+      background: rgba(0,0,0,0.3);
+      border-radius: 8px;
+      padding: 16px;
+      font-family: monospace;
+      font-size: 12px;
+      white-space: pre;
+      overflow-x: auto;
+    }
+    .user-info { font-size: 14px; color: #a1a1aa; }
+    .user-info strong { color: #f4f4f5; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Dashboard</h1>
+    <div class="nav">
+      <a href="/app">← Back to App</a>
+      <a href="#" id="logout">Logout</a>
+    </div>
+  </header>
+
+  <main>
+    <div class="card">
+      <h2>Account</h2>
+      <p class="user-info">Email: <strong id="email">Loading...</strong></p>
+      <p class="user-info" style="margin-top:8px">Member since: <strong id="created">...</strong></p>
+    </div>
+
+    <div class="card">
+      <h2>API Key</h2>
+      <div class="api-key-box">
+        <div class="api-key" id="apiKey">Loading...</div>
+        <button id="copyKey">Copy</button>
+        <button id="regenKey" class="btn-danger">Regenerate</button>
+      </div>
+      <p class="info">Use this key to authenticate MCP tools and API requests.</p>
+    </div>
+
+    <div class="card">
+      <h2>MCP Integration</h2>
+      <p class="info" style="margin-bottom:16px">Add this to your Claude Desktop or coding agent's MCP config:</p>
+      <div class="mcp-config" id="mcpConfig">Loading...</div>
+      <p class="info" style="margin-top:16px">
+        Available tools: <code>cosimo_get</code>, <code>cosimo_update</code>, <code>cosimo_add_objective</code>, <code>cosimo_add_deliverable</code>
+      </p>
+    </div>
+
+    <div class="card">
+      <h2>API Usage</h2>
+      <p class="info" style="margin-bottom:12px">Example: Update via natural language</p>
+      <pre>curl -X POST <span id="baseUrl"></span>/api/update \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"prompt": "add goal to learn Spanish"}'</pre>
+    </div>
+  </main>
+
+  <script>
+    const baseUrl = window.location.origin;
+    document.getElementById('baseUrl').textContent = baseUrl;
+
+    async function loadUser() {
+      const res = await fetch('/auth/me');
+      if (!res.ok) return window.location.href = '/';
+      const user = await res.json();
+      document.getElementById('email').textContent = user.email;
+      document.getElementById('created').textContent = new Date(user.created_at).toLocaleDateString();
+      document.getElementById('apiKey').textContent = user.api_key;
+      document.getElementById('mcpConfig').textContent = JSON.stringify({
+        "cosimo": {
+          "url": `${baseUrl}/mcp`,
+          "headers": { "x-api-key": user.api_key }
+        }
+      }, null, 2);
+    }
+
+    document.getElementById('copyKey').addEventListener('click', () => {
+      navigator.clipboard.writeText(document.getElementById('apiKey').textContent);
+      document.getElementById('copyKey').textContent = 'Copied!';
+      setTimeout(() => document.getElementById('copyKey').textContent = 'Copy', 2000);
+    });
+
+    document.getElementById('regenKey').addEventListener('click', async () => {
+      if (!confirm('Regenerate API key? Existing integrations will stop working.')) return;
+      const res = await fetch('/auth/regenerate-key', { method: 'POST' });
+      const { apiKey } = await res.json();
+      document.getElementById('apiKey').textContent = apiKey;
+      loadUser();
+    });
+
+    document.getElementById('logout').addEventListener('click', async (e) => {
+      e.preventDefault();
+      await fetch('/auth/logout', { method: 'POST' });
+      window.location.href = '/';
+    });
+
+    loadUser();
+  </script>
+</body>
+</html>
