@@ -55,7 +55,7 @@ Add to your Claude Code MCP settings:
   "mcpServers": {
     "cosimo": {
       "command": "npx",
-      "args": ["-y", "cosimo"],
+      "args": ["-y", "@bicameral/cosimo-mcp"],
       "env": {
         "COSIMO_API_KEY": "csk_your_api_key_here",
         "COSIMO_PASSPHRASE": "your_encryption_passphrase"

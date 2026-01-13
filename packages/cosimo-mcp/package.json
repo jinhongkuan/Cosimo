@@ -1,10 +1,10 @@
 {
-  "name": "cosimo",
+  "name": "@bicameral/cosimo-mcp",
   "version": "1.0.0",
   "description": "Local MCP server for Cosimo with true end-to-end encryption",
   "type": "module",
   "bin": {
-    "cosimo-mcp": "./src/index.js"
+    "cosimo": "./src/index.js"
   },
   "main": "./src/index.js",
   "engines": {

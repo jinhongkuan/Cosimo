@@ -312,7 +312,7 @@
         document.getElementById('mcpConfig').textContent = JSON.stringify({
           "cosimo": {
             "command": "npx",
-            "args": ["-y", "cosimo"],
+            "args": ["-y", "@bicameral/cosimo-mcp"],
             "env": {
               "COSIMO_API_KEY": currentUser.api_key,
               "COSIMO_PASSPHRASE": "YOUR_PASSPHRASE"
@@ -336,7 +336,7 @@ curl ${baseUrl}/api/blob \\
         document.getElementById('mcpConfig').textContent = JSON.stringify({
           "cosimo": {
             "command": "npx",
-            "args": ["-y", "cosimo"],
+            "args": ["-y", "@bicameral/cosimo-mcp"],
             "env": {
               "COSIMO_API_KEY": currentUser.api_key
             }
