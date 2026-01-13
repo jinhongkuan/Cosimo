@@ -124,6 +124,33 @@ If encryption is not enabled, only the API key is needed.
 
 ## Scoring Guidelines
 
+### LNO Framework (Apply Before Scoring)
+
+Before scoring any deliverable, classify it using the LNO framework:
+
+**Leverage (L)** — High-impact work that multiplies your effectiveness
+- Strategic decisions, key presentations, architecture choices, relationship-building
+- These compound over time — worth investing deeply
+- *Boost urgency by +10-20 points* when linked to high-impact objectives
+
+**Neutral (N)** — Important but incremental work
+- Routine reviews, standard features, recurring processes
+- Aim for "good enough" (C+/B-) — don't let perfectionism inflate priority
+- *Score as-is* — resist urge to over-prioritize
+
+**Overhead (O)** — Administrative tasks with minimal direct impact
+- Status updates, formatting, scheduling, paperwork
+- Minimize time investment — just get it done
+- *Cap urgency at 60* unless truly deadline-bound
+- Ask: "Can this be delegated, batched, or automated?"
+
+**Watch for traps:**
+- Overhead masquerading as leverage (e.g., perfecting a status report)
+- Neutral work feeling urgent due to recency or requester seniority
+- Note these patterns in the semantic bridge when relevant
+
+### Base Scoring
+
 Urgency (objectives):
 - 90-100: Due this week, critical impact
 - 70-89: Due this month, high impact
@@ -135,6 +162,20 @@ Feasibility (deliverables):
 - 70-89: Can do this week, minor prep needed
 - 50-69: Requires coordination or has dependencies
 - <50: Blocked or highly complex
+
+### LNO-Adjusted Scoring
+
+After determining base scores, apply LNO adjustments:
+
+| Category | Urgency Adjustment | Feasibility Note |
+|----------|-------------------|------------------|
+| Leverage | +10 to +20 | Invest time — complexity is worth it |
+| Neutral | No change | "Good enough" execution — don't over-engineer |
+| Overhead | Cap at 60 | High feasibility expected — minimal effort |
+
+In the semantic bridge, optionally note the LNO category:
+- "This is leverage work — the API architecture will compound across all features"
+- "This is overhead — batch with other admin tasks, don't over-polish"
 
 ## Time-Aware Prioritization
 
