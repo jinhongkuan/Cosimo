@@ -161,6 +161,22 @@
     </div>
   </div>
 
+  <!-- Passphrase Modal -->
+  <div id="passphraseModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.8); z-index:200; align-items:center; justify-content:center;">
+    <div style="background:linear-gradient(135deg, #1a1a2e, #16213e); border-radius:16px; padding:32px; max-width:400px; width:90%; border:1px solid rgba(129,140,248,0.3);">
+      <h2 style="font-size:18px; color:#f4f4f5; margin-bottom:8px;">Passphrase Required</h2>
+      <p style="font-size:13px; color:#a1a1aa; margin-bottom:20px;">Your data is encrypted. Enter your passphrase to decrypt.</p>
+      <input type="password" id="passphraseInput" placeholder="Enter passphrase" style="width:100%; padding:12px 16px; border:1px solid rgba(255,255,255,0.1); background:rgba(0,0,0,0.3); border-radius:8px; color:white; font-size:14px; margin-bottom:12px;">
+      <p id="passphraseError" style="color:#ef4444; font-size:12px; margin-bottom:12px; display:none;"></p>
+      <div style="display:flex; gap:12px;">
+        <button id="passphraseSubmit" style="flex:1; padding:12px; background:#818cf8; border:none; border-radius:8px; color:white; font-weight:500; cursor:pointer;">Unlock</button>
+        <label style="display:flex; align-items:center; gap:6px; font-size:12px; color:#71717a; cursor:pointer;">
+          <input type="checkbox" id="rememberPassphrase" checked> Remember
+        </label>
+      </div>
+    </div>
+  </div>
+
   <script>
     let data = null;
     let selected = null;
@@ -172,7 +188,12 @@
     function render() {
       if (!data) return;
       const objs = [...data.objectives].sort((a, b) => b.urgency - a.urgency);
-      const dels = [...data.deliverables].sort((a, b) => b.feasibility - a.feasibility);
+      // Sort deliverables: active by feasibility desc, then completed at bottom
+      const dels = [...data.deliverables].sort((a, b) => {
+        if (a.completed && !b.completed) return 1;
+        if (!a.completed && b.completed) return -1;
+        return b.feasibility - a.feasibility;
+      });
 
       const linkedIds = new Set();
       if (hovered || selected) {
@@ -195,18 +216,22 @@
       }).join('');
 
       document.getElementById('deliverables').innerHTML = dels.map(d => {
-        const [bg, border] = feasColor(d.feasibility);
+        const isCompleted = d.completed;
+        const [bg, border] = isCompleted ? ['rgba(100,100,100,0.1)', '#555'] : feasColor(d.feasibility);
         const dimmed = anyActive && !linkedIds.has(d.id) ? 'dimmed' : '';
         const sel = selected?.id === d.id ? 'selected' : '';
-        return `<div class="bubble ${dimmed} ${sel}" data-id="${d.id}" style="background:${bg};border:2px solid ${sel ? '#818cf8' : border}">
-          <div class="bubble-header"><span class="bubble-title">${d.title}</span><span class="bubble-badge" style="background:${border}">${d.feasibility}%</span></div>
+        const completedClass = isCompleted ? 'completed' : '';
+        return `<div class="bubble ${dimmed} ${sel} ${completedClass}" data-id="${d.id}" style="background:${bg};border:2px solid ${sel ? '#818cf8' : border};${isCompleted ? 'opacity:0.5;' : ''}">
+          <div class="bubble-header">
+            <span class="bubble-title" style="${isCompleted ? 'text-decoration:line-through;' : ''}">${d.title}</span>
+            ${isCompleted ? '<span class="bubble-badge" style="background:#22c55e;">Done</span>' : `<span class="bubble-badge" style="background:${border}">${d.feasibility}%</span>`}
+          </div>
           <p class="bubble-desc">${d.description}</p>
-          ${d.blockers?.length ? `<p class="bubble-meta bubble-blocker">Blocked by: ${d.blockers.length} item(s)</p>` : ''}
+          ${d.blockers?.length && !isCompleted ? `<p class="bubble-meta bubble-blocker">Blocked by: ${d.blockers.length} item(s)</p>` : ''}
         </div>`;
       }).join('');
 
       drawLines();
-      bindEvents();
     }
 
     function drawLines() {
@@ -246,24 +271,176 @@
       });
     }
 
-    function bindEvents() {
-      document.querySelectorAll('.bubble').forEach(el => {
-        el.addEventListener('mouseenter', () => {
-          hovered = findItem(el.dataset.id);
+    // Use event delegation instead of binding on each render
+    function setupEventDelegation() {
+      const main = document.getElementById('main');
+
+      main.addEventListener('mouseenter', (e) => {
+        const bubble = e.target.closest('.bubble');
+        if (bubble) {
+          hovered = findItem(bubble.dataset.id);
           render();
-        });
-        el.addEventListener('mouseleave', () => { hovered = null; render(); });
-        el.addEventListener('click', () => {
-          const item = findItem(el.dataset.id);
+        }
+      }, true);
+
+      main.addEventListener('mouseleave', (e) => {
+        const bubble = e.target.closest('.bubble');
+        if (bubble) {
+          hovered = null;
+          render();
+        }
+      }, true);
+
+      main.addEventListener('click', (e) => {
+        const bubble = e.target.closest('.bubble');
+        console.log('Click detected', bubble, e.target);
+        if (bubble) {
+          const item = findItem(bubble.dataset.id);
+          console.log('Found item:', item);
+          if (!item) return;
           selected = selected?.id === item.id ? null : item;
+          console.log('Selected:', selected);
           showPanel();
           render();
-        });
+        }
+      });
+
+      main.addEventListener('dblclick', (e) => {
+        const bubble = e.target.closest('.bubble');
+        if (bubble) {
+          const item = findItem(bubble.dataset.id);
+          if (item.id.startsWith('del-')) {
+            completeDeliverable(item, bubble);
+          } else {
+            showCompleteObjectiveModal(item);
+          }
+        }
       });
     }
 
     function findItem(id) {
+      if (!data) return null;
       return data.objectives.find(o => o.id === id) || data.deliverables.find(d => d.id === id);
+    }
+
+    // Confetti animation
+    function showConfetti(element) {
+      const rect = element.getBoundingClientRect();
+      const colors = ['#818cf8', '#c084fc', '#22c55e', '#fbbf24', '#ef4444'];
+
+      for (let i = 0; i < 30; i++) {
+        const confetti = document.createElement('div');
+        confetti.style.cssText = `
+          position: fixed;
+          width: 10px;
+          height: 10px;
+          background: ${colors[Math.floor(Math.random() * colors.length)]};
+          left: ${rect.left + rect.width / 2}px;
+          top: ${rect.top + rect.height / 2}px;
+          pointer-events: none;
+          border-radius: ${Math.random() > 0.5 ? '50%' : '0'};
+          z-index: 1000;
+        `;
+        document.body.appendChild(confetti);
+
+        const angle = (Math.random() * 360) * (Math.PI / 180);
+        const velocity = 5 + Math.random() * 10;
+        const vx = Math.cos(angle) * velocity;
+        const vy = Math.sin(angle) * velocity;
+
+        let x = 0, y = 0, opacity = 1;
+        const animate = () => {
+          x += vx;
+          y += vy + 2; // gravity
+          opacity -= 0.02;
+          confetti.style.transform = `translate(${x}px, ${y}px) rotate(${x * 5}deg)`;
+          confetti.style.opacity = opacity;
+          if (opacity > 0) {
+            requestAnimationFrame(animate);
+          } else {
+            confetti.remove();
+          }
+        };
+        requestAnimationFrame(animate);
+      }
+    }
+
+    async function completeDeliverable(item, element) {
+      showConfetti(element);
+
+      // Mark as completed (moves to bottom)
+      item.completed = true;
+      data.lastUpdated = new Date().toISOString();
+
+      // Save to server
+      const passphrase = getStoredPassphrase();
+      try {
+        await fetch('/api/data', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ data, passphrase })
+        });
+      } catch (e) {
+        console.error('Failed to save:', e);
+      }
+
+      render();
+    }
+
+    function showCompleteObjectiveModal(objective) {
+      const confirmed = confirm(`Mark "${objective.title}" as complete?\n\nThis will also remove any deliverables that are only connected to this objective.`);
+      if (confirmed) {
+        completeObjective(objective);
+      }
+    }
+
+    async function completeObjective(objective) {
+      // Find deliverables that will become orphaned
+      const orphanedDels = data.deliverables.filter(d => {
+        const linkedObjs = d.linkedObjectives || [];
+        // Only linked to this objective
+        return linkedObjs.length === 1 && linkedObjs[0] === objective.id;
+      });
+
+      // Remove the objective
+      data.objectives = data.objectives.filter(o => o.id !== objective.id);
+
+      // Remove orphaned deliverables
+      orphanedDels.forEach(d => {
+        data.deliverables = data.deliverables.filter(del => del.id !== d.id);
+        // Clean up relationships
+        Object.keys(data.relationships).forEach(k => {
+          if (k.endsWith(`:${d.id}`)) delete data.relationships[k];
+        });
+      });
+
+      // Clean up relationships for the objective
+      Object.keys(data.relationships).forEach(k => {
+        if (k.startsWith(`${objective.id}:`)) delete data.relationships[k];
+      });
+
+      // Update remaining deliverables to remove this objective from their links
+      data.deliverables.forEach(d => {
+        d.linkedObjectives = (d.linkedObjectives || []).filter(id => id !== objective.id);
+      });
+
+      data.lastUpdated = new Date().toISOString();
+
+      // Save to server
+      const passphrase = getStoredPassphrase();
+      try {
+        await fetch('/api/data', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ data, passphrase })
+        });
+      } catch (e) {
+        console.error('Failed to save:', e);
+      }
+
+      selected = null;
+      showPanel();
+      render();
     }
 
     function showPanel() {
@@ -302,19 +479,152 @@
       window.location.href = '/';
     });
 
-    // SSE for real-time updates
-    const evtSource = new EventSource('/api/stream');
-    evtSource.onmessage = (e) => {
-      const msg = JSON.parse(e.data);
-      data = msg.data;
-      document.getElementById('statusDot').style.background = '#22c55e';
-      document.getElementById('statusText').textContent = 'Synced';
-      render();
-    };
-    evtSource.onerror = () => {
-      document.getElementById('statusDot').style.background = '#ef4444';
-      document.getElementById('statusText').textContent = 'Disconnected';
-    };
+    // Passphrase handling
+    let evtSource = null;
+    let pendingPassphrase = null; // Track passphrase being tested
+    const PASSPHRASE_KEY = 'cosimo_passphrase';
+
+    function getStoredPassphrase() {
+      return localStorage.getItem(PASSPHRASE_KEY) || sessionStorage.getItem(PASSPHRASE_KEY);
+    }
+
+    function storePassphrase(passphrase, remember) {
+      if (remember) {
+        localStorage.setItem(PASSPHRASE_KEY, passphrase);
+      } else {
+        sessionStorage.setItem(PASSPHRASE_KEY, passphrase);
+      }
+    }
+
+    function clearStoredPassphrase() {
+      localStorage.removeItem(PASSPHRASE_KEY);
+      sessionStorage.removeItem(PASSPHRASE_KEY);
+    }
+
+    function showPassphraseModal() {
+      const modal = document.getElementById('passphraseModal');
+      modal.style.display = 'flex';
+      document.getElementById('passphraseInput').focus();
+    }
+
+    function hidePassphraseModal() {
+      document.getElementById('passphraseModal').style.display = 'none';
+      document.getElementById('passphraseInput').value = '';
+      document.getElementById('passphraseError').style.display = 'none';
+    }
+
+    function showPassphraseError(msg) {
+      const errorEl = document.getElementById('passphraseError');
+      errorEl.textContent = msg;
+      errorEl.style.display = 'block';
+    }
+
+    async function connectStream(passphrase = null) {
+      // Close existing connection
+      if (evtSource) {
+        evtSource.close();
+      }
+
+      pendingPassphrase = passphrase;
+      const url = passphrase ? `/api/stream?passphrase=${encodeURIComponent(passphrase)}` : '/api/stream';
+
+      document.getElementById('statusDot').style.background = '#fbbf24';
+      document.getElementById('statusText').textContent = 'Connecting...';
+
+      evtSource = new EventSource(url);
+
+      evtSource.onmessage = (e) => {
+        const msg = JSON.parse(e.data);
+        data = msg.data;
+        pendingPassphrase = null;
+        document.getElementById('statusDot').style.background = '#22c55e';
+        document.getElementById('statusText').textContent = 'Synced';
+        hidePassphraseModal();
+        render();
+      };
+
+      evtSource.onerror = () => {
+        evtSource.close();
+
+        // If we were testing a passphrase and it failed, show error
+        if (pendingPassphrase) {
+          clearStoredPassphrase();
+          document.getElementById('statusDot').style.background = '#fbbf24';
+          document.getElementById('statusText').textContent = 'Locked';
+          showPassphraseError('Invalid passphrase. Please try again.');
+          showPassphraseModal();
+          pendingPassphrase = null;
+        } else {
+          document.getElementById('statusDot').style.background = '#ef4444';
+          document.getElementById('statusText').textContent = 'Disconnected';
+        }
+      };
+    }
+
+    // Check if encryption is enabled and prompt for passphrase if needed
+    async function initConnection() {
+      try {
+        const res = await fetch('/auth/me');
+        if (!res.ok) {
+          window.location.href = '/';
+          return;
+        }
+        const user = await res.json();
+
+        if (user.encryption_enabled) {
+          const storedPassphrase = getStoredPassphrase();
+          if (storedPassphrase) {
+            // Try with stored passphrase
+            connectStream(storedPassphrase);
+          } else {
+            // Need to prompt for passphrase
+            document.getElementById('statusDot').style.background = '#fbbf24';
+            document.getElementById('statusText').textContent = 'Locked';
+            showPassphraseModal();
+          }
+        } else {
+          // No encryption, connect directly
+          connectStream(null);
+        }
+      } catch (e) {
+        document.getElementById('statusDot').style.background = '#ef4444';
+        document.getElementById('statusText').textContent = 'Error';
+      }
+    }
+
+    // Passphrase modal handlers
+    document.getElementById('passphraseSubmit').addEventListener('click', () => {
+      const passphrase = document.getElementById('passphraseInput').value;
+      const remember = document.getElementById('rememberPassphrase').checked;
+
+      if (!passphrase) {
+        showPassphraseError('Please enter your passphrase');
+        return;
+      }
+
+      storePassphrase(passphrase, remember);
+      connectStream(passphrase);
+    });
+
+    document.getElementById('passphraseInput').addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') {
+        document.getElementById('passphraseSubmit').click();
+      }
+    });
+
+    // Setup event delegation once
+    setupEventDelegation();
+
+    // Clear hover when mouse leaves main area entirely
+    document.getElementById('main').addEventListener('mouseleave', () => {
+      if (hovered) {
+        hovered = null;
+        render();
+      }
+    });
+
+    // Initial connection
+    initConnection();
 
     window.addEventListener('resize', () => data && drawLines());
   </script>
