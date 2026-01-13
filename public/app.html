@@ -161,6 +161,24 @@
     </div>
   </div>
 
+  <!-- Empty State Toast -->
+  <div id="emptyToast" style="display:none; position:fixed; bottom:32px; left:50%; transform:translateX(-50%); background:linear-gradient(135deg, #818cf8, #c084fc); border-radius:12px; padding:16px 24px; z-index:150; cursor:pointer; box-shadow:0 8px 32px rgba(129,140,248,0.4); transition:all 0.3s ease;" onclick="window.location.href='/dashboard'">
+    <div style="display:flex; align-items:center; gap:12px;">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
+        <circle cx="12" cy="12" r="10"/>
+        <line x1="12" y1="8" x2="12" y2="12"/>
+        <line x1="12" y1="16" x2="12.01" y2="16"/>
+      </svg>
+      <div>
+        <p style="color:white; font-weight:600; font-size:14px; margin:0;">No goals yet</p>
+        <p style="color:rgba(255,255,255,0.8); font-size:12px; margin:4px 0 0 0;">Click here to set up AI agent integration</p>
+      </div>
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" style="margin-left:8px;">
+        <polyline points="9 18 15 12 9 6"/>
+      </svg>
+    </div>
+  </div>
+
   <!-- Passphrase Modal -->
   <div id="passphraseModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.8); z-index:200; align-items:center; justify-content:center;">
     <div style="background:linear-gradient(135deg, #1a1a2e, #16213e); border-radius:16px; padding:32px; max-width:400px; width:90%; border:1px solid rgba(129,140,248,0.3);">
@@ -187,6 +205,13 @@
 
     function render() {
       if (!data) return;
+
+      // Show empty state toast if no objectives and no deliverables
+      const emptyToast = document.getElementById('emptyToast');
+      const isEmpty = (!data.objectives || data.objectives.length === 0) &&
+                      (!data.deliverables || data.deliverables.length === 0);
+      emptyToast.style.display = isEmpty ? 'block' : 'none';
+
       const objs = [...data.objectives].sort((a, b) => b.urgency - a.urgency);
       // Sort deliverables: active by feasibility desc, then completed at bottom
       const dels = [...data.deliverables].sort((a, b) => {

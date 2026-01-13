@@ -258,6 +258,18 @@
   </div>
 
   <script>
+    // Check if user is already logged in, redirect to app
+    (async () => {
+      try {
+        const res = await fetch('/auth/me');
+        if (res.ok) {
+          window.location.href = '/app';
+        }
+      } catch (e) {
+        // Not logged in, stay on login page
+      }
+    })();
+
     function toggleEncryptionInfo() {
       const badge = document.getElementById('securityBadge');
       const tooltip = document.getElementById('encryptionTooltip');
