@@ -4,6 +4,9 @@ import { encryptData, decryptData, isEncrypted, verifyPassphrase } from './crypt
 
 export const mcpRouter = express.Router();
 
+// Store active SSE connections
+const sseConnections = new Map();
+
 // Auth middleware that validates API key and optionally passphrase
 async function mcpAuth(req, res, next) {
   const apiKey = req.headers['x-api-key'] || req.query.api_key;
@@ -361,5 +364,376 @@ mcpRouter.post('/execute', mcpAuth, async (req, res) => {
   } catch (err) {
     console.error('MCP error:', err);
     res.status(500).json({ error: err.message });
+  }
+});
+
+// ===========================================
+// MCP JSON-RPC Protocol (for Claude Code/Desktop)
+// ===========================================
+
+const MCP_TOOLS = [
+  {
+    name: 'cosimo_get',
+    description: 'Get all objectives and deliverables with their relationships',
+    inputSchema: { type: 'object', properties: {}, required: [] }
+  },
+  {
+    name: 'cosimo_set',
+    description: 'Replace entire data (objectives, deliverables, relationships)',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        data: {
+          type: 'object',
+          description: 'Full data object with objectives, deliverables, relationships arrays/objects'
+        }
+      },
+      required: ['data']
+    }
+  },
+  {
+    name: 'cosimo_add_objective',
+    description: 'Add a new objective (goal). Returns the new objective with generated ID.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        title: { type: 'string' },
+        description: { type: 'string' },
+        urgency: { type: 'number', minimum: 0, maximum: 100, description: 'Higher = more urgent' },
+        deadline: { type: 'string', format: 'date' },
+        impact: { type: 'string', enum: ['low', 'medium', 'high', 'critical'] }
+      },
+      required: ['title']
+    }
+  },
+  {
+    name: 'cosimo_add_deliverable',
+    description: 'Add a new deliverable (action) and link it to an objective',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        title: { type: 'string' },
+        description: { type: 'string' },
+        feasibility: { type: 'number', minimum: 0, maximum: 100, description: 'Higher = easier to do' },
+        complexity: { type: 'string', enum: ['low', 'medium', 'high'] },
+        objectiveId: { type: 'string', description: 'ID of objective to link (e.g., obj-1)' },
+        relationship: { type: 'string', description: 'Semantic bridge: how this action achieves the goal' },
+        available_after: { type: 'string', format: 'date', description: 'Date when this becomes actionable' },
+        due_before: { type: 'string', format: 'date', description: 'Hard deadline for this action' }
+      },
+      required: ['title', 'objectiveId']
+    }
+  },
+  {
+    name: 'cosimo_update_objective',
+    description: 'Update an existing objective',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        id: { type: 'string', description: 'Objective ID (e.g., obj-1)' },
+        title: { type: 'string' },
+        description: { type: 'string' },
+        urgency: { type: 'number' },
+        deadline: { type: 'string' },
+        impact: { type: 'string' }
+      },
+      required: ['id']
+    }
+  },
+  {
+    name: 'cosimo_update_deliverable',
+    description: 'Update an existing deliverable',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        id: { type: 'string', description: 'Deliverable ID (e.g., del-1)' },
+        title: { type: 'string' },
+        description: { type: 'string' },
+        feasibility: { type: 'number' },
+        complexity: { type: 'string' },
+        available_after: { type: 'string', format: 'date' },
+        due_before: { type: 'string', format: 'date' }
+      },
+      required: ['id']
+    }
+  },
+  {
+    name: 'cosimo_delete',
+    description: 'Delete an objective or deliverable by ID',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        id: { type: 'string', description: 'ID to delete (e.g., obj-1 or del-2)' }
+      },
+      required: ['id']
+    }
+  }
+];
+
+const MCP_SERVER_INFO = {
+  name: 'cosimo',
+  version: '1.0.0',
+  protocolVersion: '2024-11-05'
+};
+
+// Helper to execute a tool and return result
+async function executeTool(toolName, args, userId, encryptionEnabled, passphrase) {
+  let data = await getUserData(userId, encryptionEnabled, passphrase);
+
+  switch (toolName) {
+    case 'cosimo_get':
+      return { content: [{ type: 'text', text: JSON.stringify(data, null, 2) }] };
+
+    case 'cosimo_set':
+      data = { ...args.data, lastUpdated: new Date().toISOString() };
+      await saveUserData(userId, encryptionEnabled, passphrase, data);
+      return { content: [{ type: 'text', text: JSON.stringify(data, null, 2) }] };
+
+    case 'cosimo_add_objective': {
+      const maxId = data.objectives.length ? Math.max(...data.objectives.map(o => parseInt(o.id.split('-')[1]))) : 0;
+      const newObj = {
+        id: `obj-${maxId + 1}`,
+        title: args.title,
+        description: args.description || '',
+        urgency: args.urgency ?? 50,
+        deadline: args.deadline || '',
+        impact: args.impact || 'medium',
+        linkedDeliverables: []
+      };
+      data.objectives.push(newObj);
+      data.lastUpdated = new Date().toISOString();
+      await saveUserData(userId, encryptionEnabled, passphrase, data);
+      return { content: [{ type: 'text', text: `Created objective: ${JSON.stringify(newObj, null, 2)}` }] };
+    }
+
+    case 'cosimo_add_deliverable': {
+      const maxId = data.deliverables.length ? Math.max(...data.deliverables.map(d => parseInt(d.id.split('-')[1]))) : 0;
+      const newDel = {
+        id: `del-${maxId + 1}`,
+        title: args.title,
+        description: args.description || '',
+        feasibility: args.feasibility ?? 50,
+        complexity: args.complexity || 'medium',
+        blockers: [],
+        linkedObjectives: [args.objectiveId],
+        ...(args.available_after && { available_after: args.available_after }),
+        ...(args.due_before && { due_before: args.due_before })
+      };
+      data.deliverables.push(newDel);
+
+      const obj = data.objectives.find(o => o.id === args.objectiveId);
+      if (obj) obj.linkedDeliverables.push(newDel.id);
+
+      if (args.relationship) {
+        data.relationships[`${args.objectiveId}:${newDel.id}`] = args.relationship;
+      }
+      data.lastUpdated = new Date().toISOString();
+      await saveUserData(userId, encryptionEnabled, passphrase, data);
+      return { content: [{ type: 'text', text: `Created deliverable: ${JSON.stringify(newDel, null, 2)}` }] };
+    }
+
+    case 'cosimo_update_objective': {
+      const obj = data.objectives.find(o => o.id === args.id);
+      if (!obj) throw new Error('Objective not found');
+      Object.assign(obj, {
+        ...(args.title && { title: args.title }),
+        ...(args.description && { description: args.description }),
+        ...(args.urgency !== undefined && { urgency: args.urgency }),
+        ...(args.deadline && { deadline: args.deadline }),
+        ...(args.impact && { impact: args.impact })
+      });
+      data.lastUpdated = new Date().toISOString();
+      await saveUserData(userId, encryptionEnabled, passphrase, data);
+      return { content: [{ type: 'text', text: `Updated objective: ${JSON.stringify(obj, null, 2)}` }] };
+    }
+
+    case 'cosimo_update_deliverable': {
+      const del = data.deliverables.find(d => d.id === args.id);
+      if (!del) throw new Error('Deliverable not found');
+      Object.assign(del, {
+        ...(args.title && { title: args.title }),
+        ...(args.description && { description: args.description }),
+        ...(args.feasibility !== undefined && { feasibility: args.feasibility }),
+        ...(args.complexity && { complexity: args.complexity }),
+        ...(args.available_after && { available_after: args.available_after }),
+        ...(args.due_before && { due_before: args.due_before })
+      });
+      data.lastUpdated = new Date().toISOString();
+      await saveUserData(userId, encryptionEnabled, passphrase, data);
+      return { content: [{ type: 'text', text: `Updated deliverable: ${JSON.stringify(del, null, 2)}` }] };
+    }
+
+    case 'cosimo_delete': {
+      const id = args.id;
+      if (id.startsWith('obj-')) {
+        data.objectives = data.objectives.filter(o => o.id !== id);
+        data.deliverables.forEach(d => {
+          d.linkedObjectives = d.linkedObjectives.filter(oid => oid !== id);
+        });
+        Object.keys(data.relationships).forEach(k => {
+          if (k.startsWith(`${id}:`)) delete data.relationships[k];
+        });
+      } else if (id.startsWith('del-')) {
+        data.deliverables = data.deliverables.filter(d => d.id !== id);
+        data.objectives.forEach(o => {
+          o.linkedDeliverables = o.linkedDeliverables.filter(did => did !== id);
+        });
+        Object.keys(data.relationships).forEach(k => {
+          if (k.endsWith(`:${id}`)) delete data.relationships[k];
+        });
+      }
+      data.lastUpdated = new Date().toISOString();
+      await saveUserData(userId, encryptionEnabled, passphrase, data);
+      return { content: [{ type: 'text', text: `Deleted ${id}` }] };
+    }
+
+    default:
+      throw new Error(`Unknown tool: ${toolName}`);
+  }
+}
+
+// Handle JSON-RPC request
+async function handleJsonRpc(request, userId, encryptionEnabled, passphrase) {
+  const { method, params, id } = request;
+
+  switch (method) {
+    case 'initialize':
+      return {
+        jsonrpc: '2.0',
+        id,
+        result: {
+          protocolVersion: MCP_SERVER_INFO.protocolVersion,
+          serverInfo: { name: MCP_SERVER_INFO.name, version: MCP_SERVER_INFO.version },
+          capabilities: { tools: {} }
+        }
+      };
+
+    case 'notifications/initialized':
+      return null; // No response needed for notifications
+
+    case 'tools/list':
+      return {
+        jsonrpc: '2.0',
+        id,
+        result: { tools: MCP_TOOLS }
+      };
+
+    case 'tools/call': {
+      const { name, arguments: args } = params;
+      try {
+        const result = await executeTool(name, args || {}, userId, encryptionEnabled, passphrase);
+        return {
+          jsonrpc: '2.0',
+          id,
+          result
+        };
+      } catch (err) {
+        return {
+          jsonrpc: '2.0',
+          id,
+          result: {
+            content: [{ type: 'text', text: `Error: ${err.message}` }],
+            isError: true
+          }
+        };
+      }
+    }
+
+    default:
+      return {
+        jsonrpc: '2.0',
+        id,
+        error: { code: -32601, message: `Method not found: ${method}` }
+      };
+  }
+}
+
+// SSE endpoint for MCP - establishes connection and returns session ID
+mcpRouter.get('/', async (req, res) => {
+  const apiKey = req.headers['x-api-key'] || req.query.api_key;
+  const passphrase = req.headers['x-passphrase'] || req.query.passphrase;
+
+  if (!apiKey) {
+    return res.status(401).json({ error: 'API key required. Add x-api-key header or ?api_key= query param.' });
+  }
+
+  const user = await queryOne(
+    'SELECT id, api_key, encryption_enabled, passphrase_hash FROM users WHERE api_key = $1',
+    [apiKey]
+  );
+
+  if (!user) {
+    return res.status(401).json({ error: 'Invalid API key' });
+  }
+
+  if (user.encryption_enabled) {
+    if (!passphrase) {
+      return res.status(401).json({ error: 'Passphrase required for encrypted account. Add x-passphrase header.' });
+    }
+    if (!verifyPassphrase(passphrase, user.passphrase_hash)) {
+      return res.status(401).json({ error: 'Invalid passphrase' });
+    }
+  }
+
+  // Set up SSE
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.flushHeaders();
+
+  // Generate session ID
+  const sessionId = `session_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+
+  // Store connection info
+  sseConnections.set(sessionId, {
+    res,
+    userId: user.id,
+    encryptionEnabled: user.encryption_enabled,
+    passphrase
+  });
+
+  // Send endpoint event (tells client where to POST messages)
+  const messagesUrl = `/mcp/messages?session_id=${sessionId}`;
+  res.write(`event: endpoint\ndata: ${messagesUrl}\n\n`);
+
+  // Keep-alive ping
+  const pingInterval = setInterval(() => {
+    res.write(': ping\n\n');
+  }, 30000);
+
+  // Cleanup on close
+  req.on('close', () => {
+    clearInterval(pingInterval);
+    sseConnections.delete(sessionId);
+  });
+});
+
+// POST endpoint for JSON-RPC messages
+mcpRouter.post('/messages', async (req, res) => {
+  const sessionId = req.query.session_id;
+
+  if (!sessionId || !sseConnections.has(sessionId)) {
+    return res.status(400).json({ error: 'Invalid or expired session. Reconnect to /mcp first.' });
+  }
+
+  const conn = sseConnections.get(sessionId);
+  const { userId, encryptionEnabled, passphrase } = conn;
+
+  try {
+    const response = await handleJsonRpc(req.body, userId, encryptionEnabled, passphrase);
+
+    if (response) {
+      res.json(response);
+    } else {
+      res.status(202).send(); // Accepted (for notifications)
+    }
+  } catch (err) {
+    console.error('MCP JSON-RPC error:', err);
+    res.status(500).json({
+      jsonrpc: '2.0',
+      id: req.body?.id,
+      error: { code: -32603, message: err.message }
+    });
   }
 });
