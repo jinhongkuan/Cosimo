@@ -26,6 +26,7 @@ const auth0Config = {
   },
   authorizationParams: {
     response_type: 'code',
+    scope: 'openid email profile',
     connection: 'google-oauth2'
   },
   afterCallback: async (req, res, session) => {
